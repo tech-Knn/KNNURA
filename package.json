@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/build-client.js && next build",
+    "build:client": "node scripts/build-client.js",
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
@@ -25,6 +26,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.27.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "jest": "^29.7.0",
