@@ -225,24 +225,17 @@ export async function checkMultipleIps(ips: string[]): Promise<Map<string, IpRep
 // MANUAL OVERRIDES
 // =============================================================================
 
-// Manual whitelist/blacklist (loaded from environment or database)
-const manualWhitelist = new Set<string>();
-const manualBlacklist = new Set<string>();
+import { getIpListStatus } from './db';
 
-export function addToWhitelist(ip: string): void {
-    manualWhitelist.add(ip);
-    manualBlacklist.delete(ip); // Remove from blacklist if present
+// Manual lists are now managed via Database
+// We still export these for API compatibility but they are async now
+
+export async function isWhitelisted(ip: string): Promise<boolean> {
+    const status = await getIpListStatus(ip);
+    return status === 'whitelist';
 }
 
-export function addToBlacklist(ip: string): void {
-    manualBlacklist.add(ip);
-    manualWhitelist.delete(ip); // Remove from whitelist if present
-}
-
-export function isWhitelisted(ip: string): boolean {
-    return manualWhitelist.has(ip);
-}
-
-export function isBlacklisted(ip: string): boolean {
-    return manualBlacklist.has(ip);
+export async function isBlacklisted(ip: string): Promise<boolean> {
+    const status = await getIpListStatus(ip);
+    return status === 'blacklist';
 }

@@ -57,11 +57,11 @@ export async function classify(input: ClassifyInput): Promise<FraudResult> {
     // PRIORITY 1: Manual lists (instant decision)
     // ==========================================================================
 
-    if (isBlacklisted(ip)) {
+    if (await isBlacklisted(ip)) {
         return createResult('BAD', 0, 'IP is blacklisted', startTime, flags);
     }
 
-    if (isWhitelisted(ip)) {
+    if (await isWhitelisted(ip)) {
         return createResult('GOOD', 100, 'IP is whitelisted', startTime, flags);
     }
 
