@@ -409,7 +409,6 @@ export default function FraudDashboard() {
             {/* Footer */}
             <div className="mt-8 text-center text-gray-500 text-sm">
                 Fraud Detection System v1.0 |
-                Replacing Anura at $10-50/month instead of $1,500/month
             </div>
         </div>
     );
