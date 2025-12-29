@@ -216,11 +216,26 @@ function IpListManager() {
     const [ip, setIp] = useState('');
     const [listType, setListType] = useState<'whitelist' | 'blacklist'>('blacklist');
 
-    const handleAdd = () => {
+    const handleAdd = async () => {
         if (!ip.trim()) return;
-        // TODO: Call API to add IP
-        console.log(`Adding ${ip} to ${listType}`);
-        setIp('');
+
+        try {
+            const res = await fetch('/api/ip-list', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip: ip.trim(), listType, action: 'add' }),
+            });
+
+            if (res.ok) {
+                alert(`Successfully added ${ip} to ${listType}`);
+                setIp('');
+            } else {
+                alert('Failed to add IP');
+            }
+        } catch (error) {
+            console.error('Error adding IP:', error);
+            alert('Error adding IP');
+        }
     };
 
     return (

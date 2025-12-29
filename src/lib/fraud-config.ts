@@ -30,31 +30,31 @@ export interface FraudResult {
 export const BEHAVIOR_THRESHOLDS = {
     desktop: {
         mouseMovements: {
-            good: 40,    // 40+ movements = GOOD
-            warn: 20,    // 20-39 movements = WARN
-            // Below 20 = WARN (not BAD, to reduce false positives)
+            good: 5,     // Relaxed: 5+ movements = GOOD
+            warn: 2,     // 2-4 movements = WARN
+            // Below 2 = WARN
         },
         scrollEvents: {
-            good: 3,     // 3+ scroll events = slight positive signal
+            good: 1,     // Even 1 scroll is good
         },
         clickEvents: {
-            good: 1,     // At least 1 click expected
+            good: 0,     // Clicks not required for GOOD if mouse moves exist
         },
-        minimumActiveTime: 2000, // 2 seconds minimum on page
+        minimumActiveTime: 500, // 0.5s minimum
     },
     mobile: {
         touchEvents: {
-            good: 7,     // 7+ touches = GOOD
-            warn: 3,     // 3-6 touches = WARN
-            // Below 3 = WARN
+            good: 2,     // Relaxed: 2+ touches = GOOD
+            warn: 1,     // 1 touch = WARN
+            // 0 touches = WARN
         },
         scrollEvents: {
-            good: 2,     // Mobile users scroll frequently
+            good: 1,     // 1 scroll is enough
         },
         tapEvents: {
-            good: 1,     // At least 1 tap expected
+            good: 0,     // Taps not strictly required
         },
-        minimumActiveTime: 1500, // Mobile users are faster
+        minimumActiveTime: 500, // 0.5s is enough
     },
 } as const;
 
