@@ -267,38 +267,118 @@ function IpListManager() {
     );
 }
 
+interface FraudCheckLog {
+    requestId: string;
+    ip: string;
+    classification: 'GOOD' | 'BAD' | 'WARN';
+    reason: string;
+    countryCode?: string;
+    deviceType: string;
+    createdAt: string;
+    org?: string;
+}
+
+function LogsTable({ logs }: { logs: FraudCheckLog[] }) {
+    return (
+        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-6">
+            <div className="p-4 border-b border-gray-700">
+                <h2 className="text-lg font-semibold">Traffic Activity Log</h2>
+            </div>
+            <div className="overflow-x-auto max-h-[500px]">
+                <table className="w-full text-sm text-left relative">
+                    <thead className="text-xs uppercase bg-gray-700 text-gray-400 sticky top-0 z-10">
+                        <tr>
+                            <th className="px-4 py-3">Time</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3">IP Address</th>
+                            <th className="px-4 py-3">Location</th>
+                            <th className="px-4 py-3">Network (Org)</th>
+                            <th className="px-4 py-3">Device</th>
+                            <th className="px-4 py-3">Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {logs.map((log) => (
+                            <tr key={log.requestId} className="border-b border-gray-700 hover:bg-gray-700/50">
+                                <td className="px-4 py-2 font-mono text-gray-400 whitespace-nowrap">
+                                    {new Date(log.createdAt).toLocaleTimeString()}
+                                </td>
+                                <td className="px-4 py-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${log.classification === 'GOOD' ? 'bg-green-900 text-green-300' :
+                                        log.classification === 'BAD' ? 'bg-red-900 text-red-300' :
+                                            'bg-yellow-900 text-yellow-300'
+                                        }`}>
+                                        {log.classification}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-2 font-mono">{log.ip}</td>
+                                <td className="px-4 py-2">{log.countryCode || '-'}</td>
+                                <td className="px-4 py-2 max-w-[150px] truncate" title={log.org}>{log.org || '-'}</td>
+                                <td className="px-4 py-2 capitalize">{log.deviceType}</td>
+                                <td className="px-4 py-2 max-w-[200px] truncate" title={log.reason}>
+                                    {log.reason}
+                                </td>
+                            </tr>
+                        ))}
+                        {logs.length === 0 && (
+                            <tr>
+                                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                                    No traffic logs found yet.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
 // =============================================================================
 // MAIN DASHBOARD
 // =============================================================================
 
 export default function FraudDashboard() {
     const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
+    const [logs, setLogs] = useState<FraudCheckLog[]>([]);
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [dataSource, setDataSource] = useState<'loading' | 'database' | 'mock'>('loading');
 
-    // Fetch stats from API
-    const fetchStats = async () => {
+    const fetchData = async () => {
         try {
-            const response = await fetch('/api/stats');
-            const data = await response.json();
+            const [statsRes, logsRes] = await Promise.all([
+                fetch('/api/stats'),
+                fetch('/api/logs')
+            ]);
 
-            if (data.success && data.stats) {
+            if (statsRes.ok) {
+                const data = await statsRes.json();
                 setStats(data.stats);
                 setDataSource(data.source || 'database');
+            } else {
+                console.error('Failed to fetch stats:', statsRes.statusText);
             }
+
+            if (logsRes.ok) {
+                const logsData = await logsRes.json();
+                setLogs(logsData);
+            } else {
+                console.error('Failed to fetch logs:', logsRes.statusText);
+            }
+
+            setLastUpdated(new Date());
         } catch (error) {
-            console.error('Failed to fetch stats:', error);
-            setDataSource('mock');
+            console.error('Failed to fetch data', error);
+            // Don't fall back to mock data implicitly if fetch fails, keep loading or empty
         }
-        setLastUpdated(new Date());
     };
 
     useEffect(() => {
         // Initial fetch
-        fetchStats();
+        fetchData();
 
         // Poll every 10 seconds
-        const interval = setInterval(fetchStats, 10000);
+        const interval = setInterval(fetchData, 10000);
 
         return () => clearInterval(interval);
     }, []);
@@ -373,6 +453,9 @@ export default function FraudDashboard() {
                     bad={stats.today.bad}
                 />
             </div>
+
+            {/* Traffic Logs */}
+            <LogsTable logs={logs} />
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

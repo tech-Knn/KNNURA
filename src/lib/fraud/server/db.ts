@@ -207,6 +207,19 @@ export async function insertFraudCheck(params: InsertFraudCheckParams): Promise<
     return result.insertedId.toString();
 }
 
+export async function getRecentFraudChecks(limit: number = 100): Promise<FraudCheckDocument[]> {
+    const collection = await getFraudChecksCollection();
+
+    // Fetch last N records
+    const docs = await collection
+        .find({})
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .toArray();
+
+    return docs;
+}
+
 // =============================================================================
 // DAILY STATS
 // =============================================================================
