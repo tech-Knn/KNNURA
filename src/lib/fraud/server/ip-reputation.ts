@@ -81,27 +81,68 @@ async function fetchIpReputation(ip: string): Promise<IpReputationResult> {
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUTS.ipLookup);
 
     try {
+        // 1. Try Primary (ipapi.co)
         const url = IP_API_CONFIG.free.url(ip);
         const response = await fetch(url, { signal: controller.signal });
 
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Primary HTTP ${response.status}`);
 
         const data: IpApiResponse = await response.json();
+        if (data.error) throw new Error(data.reason || 'Unknown Primary API error');
 
-        if (data.error) {
-            throw new Error(data.reason || 'Unknown API error');
-        }
-
+        clearTimeout(timeoutId);
         return parseIpApiResponse(data);
 
-    } catch (error) {
-        clearTimeout(timeoutId);
-        throw error;
+    } catch (primaryError) {
+        console.warn(`[IP Reputation] Primary API failed for ${ip}, trying fallback...`);
+
+        // 2. Try Fallback (ip-api.com)
+        // Note: Free endpoint is HTTP only, but works server-side
+        try {
+            const fallbackUrl = `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,isp,org,as,mobile,proxy,hosting`;
+            const response = await fetch(fallbackUrl, { signal: controller.signal });
+
+            if (!response.ok) throw new Error(`Fallback HTTP ${response.status}`);
+
+            const data = await response.json();
+            if (data.status !== 'success') throw new Error(data.message || 'Unknown Fallback API error');
+
+            clearTimeout(timeoutId);
+            return parseFallbackResponse(data, ip);
+
+        } catch (fallbackError) {
+            clearTimeout(timeoutId);
+            throw primaryError; // Throw original error
+        }
     }
+}
+
+function parseFallbackResponse(data: any, ip: string): IpReputationResult {
+    const asnString = data.as || '';
+    const asnNumber = parseAsn(asnString);
+    const org = (data.org || '').toLowerCase();
+
+    // Check local lists for additional verification
+    const isMobileCarrier = data.mobile || (asnNumber !== null && (ALL_CARRIER_ASNS as unknown as Set<number>).has(asnNumber));
+    const isDatacenter = data.hosting || (asnNumber !== null && DATACENTER_ASNS.has(asnNumber)) || DATACENTER_KEYWORDS.some(k => org.includes(k));
+    const isVpn = data.proxy || VPN_KEYWORDS.some(k => org.includes(k));
+
+    return {
+        ip,
+        isVpn,
+        isDatacenter,
+        isMobileCarrier,
+        isProxy: data.proxy || false,
+        isTor: false,
+        asn: asnNumber,
+        org: data.org || data.isp || '',
+        isp: data.isp || '',
+        country: data.country || '',
+        countryCode: data.countryCode || '',
+        region: data.regionName || '',
+        city: data.city || '',
+        cached: false,
+    };
 }
 
 /**

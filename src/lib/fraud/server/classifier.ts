@@ -136,7 +136,7 @@ export async function classify(input: ClassifyInput): Promise<FraudResult> {
     flags.push(...behaviorResult.flags);
 
     // High-risk browser check
-    const browserLower = device.browser.toLowerCase();
+    const browserLower = (device.browser || '').toLowerCase();
     const isHighRiskBrowser = HIGH_RISK_BROWSERS.some(b => browserLower.includes(b));
     if (isHighRiskBrowser) {
         flags.push('high_risk_browser');

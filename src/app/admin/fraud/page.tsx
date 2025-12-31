@@ -40,6 +40,11 @@ interface DashboardStats {
         warn: number;
         bad: number;
     }>;
+    countryStats?: Array<{
+        country: string;
+        total: number;
+        bad: number;
+    }>;
     avgProcessingTime: number;
 }
 
@@ -64,7 +69,9 @@ const EMPTY_STATS: DashboardStats = {
         bot: 0,
     },
     topBadIps: [],
+
     hourlyData: [],
+    countryStats: [],
     avgProcessingTime: 0,
 };
 
@@ -188,6 +195,35 @@ function TopBadIpsTable({ ips }: { ips: DashboardStats['topBadIps'] }) {
     );
 }
 
+
+
+function TopCountriesTable({ data }: { data: DashboardStats['countryStats'] }) {
+    if (!data || data.length === 0) return <div className="text-gray-500 text-sm">No country data yet</div>;
+
+    return (
+        <div className="overflow-hidden">
+            <table className="w-full text-sm text-left">
+                <thead className="text-xs uppercase text-gray-400 bg-gray-700/50">
+                    <tr>
+                        <th className="py-2 px-3">Country</th>
+                        <th className="py-2 px-3 text-right">Traffic</th>
+                        <th className="py-2 px-3 text-right">Bad</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                    {data.map((item, i) => (
+                        <tr key={i} className="hover:bg-gray-700/30">
+                            <td className="py-2 px-3 font-medium">{item.country}</td>
+                            <td className="py-2 px-3 text-right">{item.total.toLocaleString()}</td>
+                            <td className="py-2 px-3 text-right text-red-400">{item.bad > 0 ? item.bad : '-'}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
 function SimpleLineChart({ data }: { data: DashboardStats['hourlyData'] }) {
     const maxValue = Math.max(...data.map(d => d.good + d.warn + d.bad));
 
@@ -285,10 +321,11 @@ interface FilterState {
     ip: string;
 }
 
-function LogFilterBar({ filters, onChange, onRefresh }: {
+function LogFilterBar({ filters, onChange, onRefresh, onExport }: {
     filters: FilterState;
     onChange: (f: FilterState) => void;
     onRefresh: () => void;
+    onExport: () => void;
 }) {
     return (
         <div className="flex flex-wrap gap-4 mb-4 bg-gray-800 p-4 rounded-lg border border-gray-700 items-end">
@@ -344,6 +381,12 @@ function LogFilterBar({ filters, onChange, onRefresh }: {
                 className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded h-[38px]"
             >
                 Refresh
+            </button>
+            <button
+                onClick={onExport}
+                className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded h-[38px]"
+            >
+                Export CSV
             </button>
         </div>
     );
@@ -459,6 +502,29 @@ export default function FraudDashboard() {
         }
     };
 
+    const handleExport = () => {
+        if (!logs.length) return;
+
+        const headers = ['Time', 'Status', 'IP', 'Location', 'Network', 'Device', 'Reason'].join(',');
+        const rows = logs.map(log => [
+            new Date(log.createdAt).toISOString(),
+            log.classification,
+            log.ip,
+            log.countryCode || '',
+            log.org || '',
+            log.deviceType,
+            `"${log.reason.replace(/"/g, '""')}"`
+        ].join(','));
+
+        const csv = [headers, ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `fraud-logs-${new Date().toISOString()}.csv`;
+        a.click();
+    };
+
     useEffect(() => {
         // Initial fetch
         fetchData();
@@ -545,15 +611,22 @@ export default function FraudDashboard() {
                 filters={filters}
                 onChange={setFilters}
                 onRefresh={fetchData}
+                onExport={handleExport}
             />
             <LogsTable logs={logs} />
 
             {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 {/* Hourly Traffic */}
                 <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                     <h2 className="text-lg font-semibold mb-4">Hourly Traffic</h2>
                     <SimpleLineChart data={stats.hourlyData} />
+                </div>
+
+                {/* Country Distribution */}
+                <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <h2 className="text-lg font-semibold mb-4">Top Countries</h2>
+                    <TopCountriesTable data={stats.countryStats} />
                 </div>
 
                 {/* Device Breakdown */}

@@ -377,6 +377,36 @@ export async function getHourlyData(): Promise<Array<{
 // IP LIST OPERATIONS
 // =============================================================================
 
+export async function getCountryStats(days: number = 1): Promise<Array<{ country: string; total: number; bad: number }>> {
+    const collection = await getFraudChecksCollection();
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+
+    const pipeline = [
+        { $match: { createdAt: { $gte: date } } },
+        {
+            $group: {
+                _id: "$countryCode",
+                total: { $sum: 1 },
+                bad: {
+                    $sum: {
+                        $cond: [{ $eq: ["$classification", "BAD"] }, 1, 0]
+                    }
+                }
+            }
+        },
+        { $sort: { total: -1 } },
+        { $limit: 10 }
+    ];
+
+    const results = await collection.aggregate(pipeline).toArray();
+    return results.map(r => ({
+        country: r._id || 'Unknown',
+        total: r.total,
+        bad: r.bad
+    }));
+}
+
 export async function addToIpList(
     ip: string,
     listType: 'whitelist' | 'blacklist',

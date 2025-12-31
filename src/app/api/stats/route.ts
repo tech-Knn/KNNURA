@@ -11,6 +11,7 @@ import {
     getTopBadIps,
     getDeviceBreakdown,
     getHourlyData,
+    getCountryStats,
     checkDatabaseConnection,
 } from '@/lib/fraud/server/db';
 
@@ -29,11 +30,12 @@ export async function GET() {
         }
 
         // Fetch real data from database
-        const [todayStats, topBadIps, deviceBreakdown, hourlyData] = await Promise.all([
+        const [todayStats, topBadIps, deviceBreakdown, hourlyData, countryStats] = await Promise.all([
             getTodayStats(),
             getTopBadIps(10),
             getDeviceBreakdown(),
             getHourlyData(),
+            getCountryStats(1), // Last 24h
         ]);
 
         // Calculate rates
@@ -58,6 +60,7 @@ export async function GET() {
                 deviceBreakdown,
                 topBadIps,
                 hourlyData,
+                countryStats,
                 avgProcessingTime: todayStats?.avgProcessingTimeMs || 0,
             },
         });
