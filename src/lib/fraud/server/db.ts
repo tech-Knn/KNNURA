@@ -207,12 +207,40 @@ export async function insertFraudCheck(params: InsertFraudCheckParams): Promise<
     return result.insertedId.toString();
 }
 
-export async function getRecentFraudChecks(limit: number = 100): Promise<FraudCheckDocument[]> {
+export interface LogFilters {
+    status?: string;
+    country?: string;
+    ip?: string;
+    days?: number;
+}
+
+export async function getRecentFraudChecks(limit: number = 100, filters?: LogFilters): Promise<FraudCheckDocument[]> {
     const collection = await getFraudChecksCollection();
 
-    // Fetch last N records
+    // Build query based on filters
+    const query: any = {};
+
+    if (filters?.status && filters.status !== 'ALL') {
+        query.classification = filters.status;
+    }
+
+    if (filters?.country) {
+        query.countryCode = filters.country.toUpperCase();
+    }
+
+    if (filters?.ip) {
+        query.ip = { $regex: filters.ip, $options: 'i' }; // Partial match
+    }
+
+    if (filters?.days) {
+        const date = new Date();
+        date.setDate(date.getDate() - filters.days);
+        query.createdAt = { $gte: date };
+    }
+
+    // Fetch last N records matching the query
     const docs = await collection
-        .find({})
+        .find(query)
         .sort({ createdAt: -1 })
         .limit(limit)
         .toArray();

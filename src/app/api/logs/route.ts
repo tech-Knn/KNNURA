@@ -1,12 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getRecentFraudChecks } from '@/lib/fraud/server/db';
-import { FraudResult } from '@/lib/fraud/types';
 
 export const dynamic = 'force-dynamic'; // Disable static caching
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
-        const logs = await getRecentFraudChecks(100);
+        const searchParams = request.nextUrl.searchParams;
+
+        const limit = parseInt(searchParams.get('limit') || '100');
+        const filters = {
+            status: searchParams.get('status') || undefined,
+            country: searchParams.get('country') || undefined,
+            ip: searchParams.get('ip') || undefined,
+            days: searchParams.get('days') ? parseInt(searchParams.get('days')!) : undefined
+        };
+
+        const logs = await getRecentFraudChecks(limit, filters);
         return NextResponse.json(logs);
     } catch (error) {
         console.error('Error fetching logs:', error);

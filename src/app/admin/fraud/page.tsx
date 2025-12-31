@@ -278,6 +278,77 @@ interface FraudCheckLog {
     org?: string;
 }
 
+interface FilterState {
+    status: string;
+    days: number;
+    country: string;
+    ip: string;
+}
+
+function LogFilterBar({ filters, onChange, onRefresh }: {
+    filters: FilterState;
+    onChange: (f: FilterState) => void;
+    onRefresh: () => void;
+}) {
+    return (
+        <div className="flex flex-wrap gap-4 mb-4 bg-gray-800 p-4 rounded-lg border border-gray-700 items-end">
+            <div>
+                <label className="block text-xs text-gray-400 mb-1">Status</label>
+                <select
+                    className="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-2 w-32"
+                    value={filters.status}
+                    onChange={(e) => onChange({ ...filters, status: e.target.value })}
+                >
+                    <option value="ALL">All Status</option>
+                    <option value="GOOD">Good</option>
+                    <option value="BAD">Bad</option>
+                    <option value="WARN">Warning</option>
+                </select>
+            </div>
+
+            <div>
+                <label className="block text-xs text-gray-400 mb-1">Time Range</label>
+                <select
+                    className="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-2 w-32"
+                    value={filters.days}
+                    onChange={(e) => onChange({ ...filters, days: parseInt(e.target.value) })}
+                >
+                    <option value={1}>Last 24 Hours</option>
+                    <option value={7}>Last 7 Days</option>
+                    <option value={30}>Last 30 Days</option>
+                </select>
+            </div>
+
+            <div className="flex-1 min-w-[200px]">
+                <label className="block text-xs text-gray-400 mb-1">Search (IP or Country)</label>
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        placeholder="Search IP..."
+                        className="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-2 flex-1"
+                        value={filters.ip}
+                        onChange={(e) => onChange({ ...filters, ip: e.target.value })}
+                    />
+                    <input
+                        type="text"
+                        placeholder="Country (e.g. US)"
+                        className="bg-gray-700 border border-gray-600 text-white text-sm rounded px-3 py-2 w-24"
+                        value={filters.country}
+                        onChange={(e) => onChange({ ...filters, country: e.target.value })}
+                    />
+                </div>
+            </div>
+
+            <button
+                onClick={onRefresh}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded h-[38px]"
+            >
+                Refresh
+            </button>
+        </div>
+    );
+}
+
 function LogsTable({ logs }: { logs: FraudCheckLog[] }) {
     return (
         <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-6">
@@ -344,11 +415,26 @@ export default function FraudDashboard() {
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [dataSource, setDataSource] = useState<'loading' | 'database' | 'mock'>('loading');
 
+    // Filter State
+    const [filters, setFilters] = useState<FilterState>({
+        status: 'ALL',
+        days: 1,
+        country: '',
+        ip: ''
+    });
+
     const fetchData = async () => {
         try {
+            // Build query params for logs
+            const params = new URLSearchParams();
+            if (filters.status !== 'ALL') params.append('status', filters.status);
+            if (filters.days) params.append('days', filters.days.toString());
+            if (filters.country) params.append('country', filters.country);
+            if (filters.ip) params.append('ip', filters.ip);
+
             const [statsRes, logsRes] = await Promise.all([
                 fetch('/api/stats'),
-                fetch('/api/logs')
+                fetch(`/api/logs?${params.toString()}`)
             ]);
 
             if (statsRes.ok) {
@@ -381,36 +467,36 @@ export default function FraudDashboard() {
         const interval = setInterval(fetchData, 10000);
 
         return () => clearInterval(interval);
-    }, []);
+    }, [filters]); // Re-fetch when filters change (optional, or just use Refresh button)
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-6">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+        <div className="min-h-screen bg-gray-900 text-gray-100 p-8">
+            <div className="flex justify-between items-center mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold">Fraud Detection Dashboard</h1>
-                    <p className="text-gray-400 text-sm">
+                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                        Fraud Detection Dashboard
+                    </h1>
+                    <p className="text-gray-400 text-sm mt-1">
                         Last updated: {lastUpdated.toLocaleTimeString()}
                     </p>
                 </div>
                 <div className="flex items-center gap-4">
                     <span className="text-sm text-gray-400">
-                        Avg. Processing Time:
-                        <span className="text-green-400 ml-1">{stats.avgProcessingTime}ms</span>
+                        Avg. Processing Time: <span className="text-green-400">{stats.avgProcessingTime.toFixed(2)}ms</span>
                     </span>
-                    <div className="px-3 py-1 bg-green-600 rounded-full text-sm">
-                        System Online
+                    <div className="flex items-center gap-2 px-3 py-1 bg-green-900/30 border border-green-800 rounded-full">
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                        <span className="text-xs font-medium text-green-400">System Online</span>
                     </div>
                 </div>
             </div>
 
-            {/* Main Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <StatCard
-                    label="Total Checks (Today)"
-                    value={stats.today.total}
-                    color="text-white"
-                />
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <h3 className="text-sm text-gray-400 mb-1">Total Checks (Today)</h3>
+                    <p className="text-3xl font-bold text-white">{stats.today.total.toLocaleString()}</p>
+                </div>
                 <StatCard
                     label="Good"
                     value={stats.today.good}
@@ -455,6 +541,11 @@ export default function FraudDashboard() {
             </div>
 
             {/* Traffic Logs */}
+            <LogFilterBar
+                filters={filters}
+                onChange={setFilters}
+                onRefresh={fetchData}
+            />
             <LogsTable logs={logs} />
 
             {/* Charts Row */}
